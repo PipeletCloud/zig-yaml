@@ -103,6 +103,7 @@ fn parseValue(self: Yaml, arena: Allocator, comptime T: type, value: Value) Erro
             const scalar = try value.asScalar();
             return self.parsePointer(arena, T, .{ .scalar = scalar });
         },
+        .@"enum" => self.parseEnum(T, value),
         .void => error.TypeMismatch,
         .optional => unreachable,
         else => error.Unimplemented,
@@ -231,6 +232,13 @@ fn parseArray(self: Yaml, arena: Allocator, comptime T: type, list: List) Error!
     return parsed;
 }
 
+fn parseEnum(self: Yaml, comptime T: type, value: Value) Error!T {
+    _ = self;
+
+    const scalar = try value.asScalar();
+    return std.meta.stringToEnum(T, scalar) orelse error.InvalidEnum;
+}
+
 pub fn stringify(self: Yaml, writer: anytype) !void {
     for (self.docs.items, self.tree.?.docs) |doc, node| {
         try writer.writeAll("---");
@@ -268,6 +276,7 @@ pub const Error = error{
     UnionTagMissing,
     Overflow,
     OutOfMemory,
+    InvalidEnum,
 };
 
 pub const YamlError = error{
@@ -615,6 +624,7 @@ pub const Value = union(enum) {
 
             .null => return null,
             .bool => return Value{ .boolean = input },
+            .@"enum" => return Value{ .scalar = try arena.dupe(u8, @tagName(input)) },
 
             else => {
                 @compileError("Unhandled type: " ++ @typeName(@TypeOf(input)));
